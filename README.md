@@ -14,9 +14,6 @@ Our model integrates **CNN feature extraction** with a **Vision Transformer back
 
 ---
 
-## Installation  
-
-1. Clone this repository:
 ```bash
 git clone https://github.com/tasleemkausar845/CLVTNet.git
 cd CLVTNet
