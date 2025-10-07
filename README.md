@@ -1,8 +1,7 @@
 # CLVTNet  
 Efficient CNN-based Spatial Channel Enhanced Vision Transformer for Auditory Attention Detection Using EEG
 
-![CLVTNet Architecture](assets/model.png)
-
+![CLVTNet Architecture](https://raw.githubusercontent.com/tasleemkausar845/CLVTNet/main/figure%202.png)
 ---
 
 ## Status: Under Construction  
