@@ -5,6 +5,11 @@ Efficient CNN-based Spatial Channel Enhanced Vision Transformer for Auditory Att
 
 ---
 
+## 🚧 Status: Under Construction 🚧  
+This repository is currently **under active development**. Some features, scripts, or documentation may be incomplete or subject to change. Please check back later for updates.
+
+---
+
 ## Overview  
 This repository contains the official implementation of **CLVTNet**, an efficient **CNN-based Spatial Channel Enhanced Vision Transformer** for **Auditory Attention Detection (AAD)** using EEG signals.  
 
@@ -12,9 +17,9 @@ Our model integrates **CNN feature extraction** with a **Vision Transformer back
 
 ---
 
----
-
 ```bash
+# Example placeholder for future commands
+echo "CLVTNet code is under construction..."
 git clone https://github.com/tasleemkausar845/CLVTNet.git
 cd CLVTNet
 pip install -r requirements.txt
