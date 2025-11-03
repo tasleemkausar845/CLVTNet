@@ -4,8 +4,6 @@ Efficient CNN-based Spatial Channel Enhanced Vision Transformer for Auditory Att
 ![CLVTNet Architecture](https://raw.githubusercontent.com/tasleemkausar845/CLVTNet/main/figure%202.png)
 ---
 
-## Status: Under Construction  
-This repository is currently **under active development**. Some features, scripts, or documentation may be not completly uploaded or  subject to change. Please check back later for updates.
 
 ---
 
