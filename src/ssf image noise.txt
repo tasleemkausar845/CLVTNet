@@ -1,0 +1,96 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Generate SSF maps from EEG .npy and add Gaussian noise in IMAGE space.
+This is a PROOF-OF-CONCEPT CV-style noise robustness test, not realistic EEG noise.
+"""
+
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+from scipy.io import loadmat
+from scipy.interpolate import griddata
+from sklearn.preprocessing import scale
+import os
+
+# -------------------
+# Projection Functions
+# -------------------
+def cart2sph(x, y, z):
+    x2_y2 = x**2 + y**2
+    r = math.sqrt(x2_y2 + z**2)
+    elev = math.atan2(z, math.sqrt(x2_y2))
+    az = math.atan2(y, x)
+    return r, elev, az
+
+def pol2cart(theta, rho):
+    return rho * math.cos(theta), rho * math.sin(theta)
+
+def azim_proj(pos):
+    [_, elev, az] = cart2sph(pos[0], pos[1], pos[2])
+    return pol2cart(az, math.pi/2 - elev)
+
+# -------------------
+# Alpha Band Power
+# -------------------
+def compute_alpha_power(eeg_window, fs, alpha_low=8, alpha_high=12):
+    window_length = eeg_window.shape[0]
+    fft_data = np.fft.fft(eeg_window, n=window_length, axis=0)
+    fft_data = np.abs(fft_data) / window_length
+    freqs = np.fft.fftfreq(window_length, d=1/fs)
+    alpha_mask = (freqs >= alpha_low) & (freqs <= alpha_high)
+    alpha_power = np.sum(np.power(fft_data[alpha_mask, :], 2), axis=0)
+    return alpha_power
+
+# -------------------
+# SSF Map Generation
+# -------------------
+def generate_ssf(alpha_power, locs_3d, image_size=32):
+    locs_2d = np.array([azim_proj(e) for e in locs_3d])
+    grid_x, grid_y = np.mgrid[
+        min(locs_2d[:, 0]):max(locs_2d[:, 0]):image_size * 1j,
+        min(locs_2d[:, 1]):max(locs_2d[:, 1]):image_size * 1j
+    ]
+    img = griddata(locs_2d, alpha_power, (grid_x, grid_y),
+                   method='cubic', fill_value=np.nan)
+    img[~np.isnan(img)] = scale(img[~np.isnan(img)])
+    img = np.nan_to_num(img)
+    return img
+
+# -------------------
+# Image Gaussian Noise
+# -------------------
+def add_gaussian_noise(img, n=0.002, m=.1):
+    noise = np.random.randn(*img.shape)
+    noisy_img = n * img + m * noise
+    noisy_img = np.clip(noisy_img, 0, 255)  # CV-style
+    return noisy_img
+
+# -------------------
+# Main Processing
+# -------------------
+def process_npy_with_image_noise(npy_path, locs_mat_path, fs=128, window_sec=1.0, image_size=32, save_dir=None):
+    eeg_data = np.load(npy_path)
+    window_length = int(fs * window_sec)
+
+    locs = loadmat(locs_mat_path)
+    locs_3d = locs['data']
+
+    for start in range(0, eeg_data.shape[0] - window_length + 1, window_length):
+        eeg_window = eeg_data[start:start + window_length, :]
+        alpha_power = compute_alpha_power(eeg_window, fs)
+        ssf_map = generate_ssf(alpha_power, locs_3d, image_size=image_size)
+
+        noisy_map = add_gaussian_noise(ssf_map, n=0.5, m=1)
+
+        plt.imshow(noisy_map.T, origin='lower', cmap='viridis')
+        plt.title(f"Noisy SSF Image | Start {start/fs:.2f}s")
+        plt.axis('off')
+        plt.show()
+
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
+            plt.imsave(os.path.join(save_dir, f"ssf_noisy_{start}.png"), noisy_map.T, cmap='viridis')
+
+if __name__ == "__main__":
+    process_npy_with_image_noise("/content/drive/MyDrive/Colab Notebooks/neuroheed/KUL_eeg/eeg/S10Tra1.npy", "/content/drive/MyDrive/Colab Notebooks/neuroheed/KUL_eeg/locs_orig.mat", save_dir="noisy_images")
