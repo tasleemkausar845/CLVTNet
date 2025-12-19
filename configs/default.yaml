@@ -7,29 +7,18 @@ experiment:
   pin_memory: true
 
 data:
-  sampling_rate: 1024
+  sampling_rate: 128
   window_length: 2.0
   overlap: 0.5
   
-  frequency_bands:
-    alpha: [8.0, 12.0]
-    beta: [13.0, 30.0]
-    gamma: [30.0, 100.0]
-  
-  electrode_montage: "standard_1020"
-  image_size: 256
-  interpolation_method: "cubic"
+
   normalization: "z_score"
-  artifact_removal: true
-  filter_low: 0.5
-  filter_high: 50.0
-  notch_frequency: 50.0
+  artifact_removal_method: "ica"
 
 model:
   name: "CLVTNet"
   input_channels: 1
   num_classes: 2
-  image_size: 256
   
   embed_dims: [32, 80, 160, 256]
   num_heads: [2, 5, 10, 16]
