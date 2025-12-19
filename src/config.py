@@ -12,27 +12,16 @@ class DataConfig:
     overlap: float = 0.5
     
     use_ssf_extraction: bool = True
-    psd_method: str = 'welch'
     use_multiband_ssf: bool = False
     
     # Dataset selection
     dataset_type: str = 'KUL'  # 'KUL' or 'DTU'
     dataset_path: str = '/path/to/dataset'
     
-    # Bands for spectral features
-    frequency_bands: Dict[str, List[float]] = field(default_factory=lambda: {
-        'alpha': [8.0, 13.0],
-        'beta': [13.0, 30.0],
-        'gamma': [30.0, 100.0]
-    })
-    
-    # Cross-validation
-    cv_mode: str = 'subject'
-    cv_folds: int = 5
-    
+
     # EEG topomap settings
-    electrode_montage: str = "standard_1020"
-    image_size: int = 64
+    
+    image_size: int = 256
     interpolation_method: str = "cubic"
     normalization: str = "z_score"
     
@@ -70,11 +59,11 @@ class TrainingConfig:
     num_epochs: int = 300
     
     learning_rate: float = 0.0003
-    weight_decay: float = 0.01
+    weight_decay: float = 0.05
     warmup_epochs: int = 20
     
     optimizer: str = "adam"
-    scheduler: str = "cosine"
+    scheduler: str = "cosine_annealing"
     
     gradient_clip: float = 1.0
     
