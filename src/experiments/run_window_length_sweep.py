@@ -17,7 +17,6 @@ from data_pipeline_updated import EEGDataPipeline
 
 
 def setup_logging(output_dir: str):
-    """Setup logging configuration."""
     log_dir = Path(output_dir) / 'logs'
     log_dir.mkdir(parents=True, exist_ok=True)
     
@@ -37,19 +36,6 @@ def setup_logging(output_dir: str):
 
 def run_window_length_experiment(config: Config, window_length: float, 
                                  dataset: str, output_dir: str, device: str):
-    """
-    Run experiment with specific window length.
-    
-    Args:
-        config: Base configuration
-        window_length: Window length in seconds
-        dataset: Dataset name
-        output_dir: Output directory
-        device: Device to use
-    
-    Returns:
-        Dictionary with results
-    """
     logger = logging.getLogger(__name__)
     logger.info(f"Running experiment with window length: {window_length}s")
     
@@ -60,9 +46,7 @@ def run_window_length_experiment(config: Config, window_length: float,
     elif dataset == 'DTU':
         dataset_loader = DTUDatasetLoader(config.data.dataset_path, config.data)
     elif dataset == 'AVGC':
-        # For AVGC dataset, we need to specify the number of channels
-        # This should be configured in your Config class or passed as argument
-        n_channels = config.data.n_channels if hasattr(config.data, 'n_channels') else 32
+        n_channels = config.data.n_channels if hasattr(config.data, 'n_channels') else 64
         dataset_loader = AVGCDatasetLoader(config.data.dataset_path, config.data, n_channels)
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
@@ -83,13 +67,16 @@ def run_window_length_experiment(config: Config, window_length: float,
         pipeline.process_raw_data(
             output_dir=str(processed_data_dir),
             cv_mode=config.data.cv_mode,
-            n_folds=config.data.cv_folds
+            n_folds=1
         )
     else:
         logger.info("Using existing processed data")
     
-    results = []
-    cv_splits_path = processed_data_dir / 'cv_splits.pkl'
+    train_loader, val_loader, test_loader = pipeline.create_data_loaders(
+        data_path=str(processed_data_dir),
+        cv_splits_path=None,
+        fold=0
+    )
     
     ablation_config = AblationConfig(
         use_local_branch=True,
@@ -98,37 +85,22 @@ def run_window_length_experiment(config: Config, window_length: float,
         use_conv_module=True
     )
     
-    for fold in range(config.data.cv_folds):
-        logger.info(f"Training fold {fold + 1}/{config.data.cv_folds}")
-        
-        train_loader, val_loader, test_loader = pipeline.create_data_loaders(
-            data_path=str(processed_data_dir),
-            cv_splits_path=str(cv_splits_path) if cv_splits_path.exists() else None,
-            fold=fold
-        )
-        
-        from clvtnet import CLVTNet
-        model = CLVTNet(config, ablation_config=ablation_config)
-        model = model.to(device)
-        
-        from training import Trainer
-        trainer = Trainer(model, config, device=device, fold=fold)
-        
-        fold_results = trainer.train(train_loader, val_loader, test_loader)
-        results.append(fold_results)
-        
-        logger.info(f"Fold {fold} - Test Accuracy: {fold_results['test_accuracy']:.4f}")
+    from clvtnet import CLVTNet
+    model = CLVTNet(config, ablation_config=ablation_config)
+    model = model.to(device)
     
-    mean_accuracy = np.mean([r['test_accuracy'] for r in results])
-    std_accuracy = np.std([r['test_accuracy'] for r in results])
+    from training import Trainer
+    trainer = Trainer(model, config, device=device, fold=0)
     
-    logger.info(f"Window {window_length}s - Mean Accuracy: {mean_accuracy:.4f} ± {std_accuracy:.4f}")
+    results = trainer.train(train_loader, val_loader, test_loader)
+    
+    logger.info(f"Window {window_length}s - Test Accuracy: {results['test_accuracy']:.4f}")
     
     return {
         'window_length': window_length,
-        'mean_accuracy': float(mean_accuracy),
-        'std_accuracy': float(std_accuracy),
-        'fold_results': results
+        'mean_accuracy': float(results['test_accuracy']),
+        'std_accuracy': 0.0,
+        'fold_results': [results]
     }
 
 
@@ -150,11 +122,9 @@ def main():
                        help='Random seed')
     parser.add_argument('--cv_mode', type=str, default='subject',
                        choices=['subject', 'trial', 'story'],
-                       help='Cross-validation mode')
-    parser.add_argument('--cv_folds', type=int, default=5,
-                       help='Number of CV folds')
-    parser.add_argument('--n_channels', type=int, default=32,
-                       help='Number of channels for AVGC dataset (default: 32)')
+                       help='Validation mode')
+    parser.add_argument('--n_channels', type=int, default=64,
+                       help='Number of channels for AVGC dataset (default: 64)')
     
     args = parser.parse_args()
     
@@ -171,10 +141,9 @@ def main():
     config.data.dataset_name = args.dataset
     config.data.dataset_path = args.dataset_path
     config.data.cv_mode = args.cv_mode
-    config.data.cv_folds = args.cv_folds
+    config.data.cv_folds = 1
     config.experiment.seed = args.seed
     
-    # Add n_channels to config for AVGC dataset
     if args.dataset == 'AVGC':
         config.data.n_channels = args.n_channels
     
@@ -201,7 +170,7 @@ def main():
     logger.info("\nWindow Length Sweep Results:")
     logger.info("-" * 80)
     for window, results in all_results.items():
-        logger.info(f"{window}: {results['mean_accuracy']:.4f} ± {results['std_accuracy']:.4f}")
+        logger.info(f"{window}: {results['mean_accuracy']:.4f}")
 
 
 if __name__ == '__main__':
