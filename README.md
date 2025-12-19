@@ -17,16 +17,21 @@ git clone https://github.com/tasleemkausar845/CLVTNet.git
 cd CLVTNet
 pip install -r requirements.txt
 
+# Replace /path/to/processed_eeg_data with your actual data path
 python3 main.py \
     --config configs/default.yaml \
     --mode train \
-    --data-dir /path/to/processed_eeg_data \
+    --data-dir /your/actual/path/to/processed_eeg_data \
     --output-dir outputs \
     --log-level INFO
+
+# Replace /path/to/processed_eeg_data with your actual data path
 python3 main.py \
     --config configs/default.yaml \
     --mode evaluate \
     --model-path outputs/checkpoints/best_model.pth \
-    --data-dir /path/to/processed_eeg_data \
+    --data-dir /your/actual/path/to/processed_eeg_data \
     --output-dir outputs/evaluation \
     --log-level INFO
+
+
