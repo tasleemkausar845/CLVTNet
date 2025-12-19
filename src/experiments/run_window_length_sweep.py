@@ -11,7 +11,7 @@ import torch
 
 from src.config import Config
 from ablation_configs import AblationConfig
-from dataset_loaders import KULDatasetLoader, DTUDatasetLoader
+from dataset_loaders import KULDatasetLoader, DTUDatasetLoader, AVGCDatasetLoader
 from ssf_extraction import SSFExtractor
 from data_pipeline_updated import EEGDataPipeline
 
@@ -59,6 +59,11 @@ def run_window_length_experiment(config: Config, window_length: float,
         dataset_loader = KULDatasetLoader(config.data.dataset_path, config.data)
     elif dataset == 'DTU':
         dataset_loader = DTUDatasetLoader(config.data.dataset_path, config.data)
+    elif dataset == 'AVGC':
+        # For AVGC dataset, we need to specify the number of channels
+        # This should be configured in your Config class or passed as argument
+        n_channels = config.data.n_channels if hasattr(config.data, 'n_channels') else 32
+        dataset_loader = AVGCDatasetLoader(config.data.dataset_path, config.data, n_channels)
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
     
@@ -129,7 +134,7 @@ def run_window_length_experiment(config: Config, window_length: float,
 
 def main():
     parser = argparse.ArgumentParser(description='Run window length sweep experiments')
-    parser.add_argument('--dataset', type=str, default='KUL', choices=['KUL', 'DTU'],
+    parser.add_argument('--dataset', type=str, default='KUL', choices=['KUL', 'DTU', 'AVGC'],
                        help='Dataset to use')
     parser.add_argument('--dataset_path', type=str, required=True,
                        help='Path to dataset')
@@ -148,6 +153,8 @@ def main():
                        help='Cross-validation mode')
     parser.add_argument('--cv_folds', type=int, default=5,
                        help='Number of CV folds')
+    parser.add_argument('--n_channels', type=int, default=32,
+                       help='Number of channels for AVGC dataset (default: 32)')
     
     args = parser.parse_args()
     
@@ -166,6 +173,10 @@ def main():
     config.data.cv_mode = args.cv_mode
     config.data.cv_folds = args.cv_folds
     config.experiment.seed = args.seed
+    
+    # Add n_channels to config for AVGC dataset
+    if args.dataset == 'AVGC':
+        config.data.n_channels = args.n_channels
     
     logger.info(f"Testing window lengths: {args.window_lengths}")
     
