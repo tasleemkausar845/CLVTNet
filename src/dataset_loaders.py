@@ -227,3 +227,118 @@ class DTUDatasetLoader:
             })
         self.logger.info(f"Created {len(splits)} TLHO-V splits for DTU")
         return splits
+
+import scipy.io
+
+class AVGCDatasetLoader:
+    
+    def __init__(self, data_root: str, config, n_channels: int):
+        self.data_root = Path(data_root)
+        self.config = config
+        self.logger = logging.getLogger(__name__)
+        
+        # Critical: Set YOUR actual channel count here (e.g., 32, 64, etc.)
+        self.n_channels = n_channels  # User-defined channel count
+    
+    def _parse_filename(self, filepath: Path):
+        """Extract metadata from filename/path (unchanged, as it doesn't use electrode names)."""
+        fp_str = str(filepath).lower()
+        md = {
+            'filepath': str(filepath),
+            'subject_id': None,
+            'trial_id': None,
+            'story_id': None,
+            'label': None
+        }
+        
+        # Extract subject ID (adjust regex if your filenames use different patterns)
+        subj = re.search(r'(?:subject|subj|s)(?:[_\s]*)(\d+)', fp_str)
+        if subj:
+            md['subject_id'] = int(subj.group(1))
+        
+        # Extract trial ID (adjust regex if needed)
+        trial = re.search(r'(?:trial|run|session)(?:[_\s]*)(\d+)', fp_str)
+        if trial:
+            md['trial_id'] = int(trial.group(1))
+        
+        # Extract story ID (adjust regex if needed)
+        story = re.search(r'(?:story|audio|stimulus)(?:[_\s]*)(\d+)', fp_str)
+        if story:
+            md['story_id'] = int(story.group(1))
+        
+        # Extract attention label (0: left, 1: right; adjust based on YOUR filenames)
+        if 'left' in fp_str or 'attend_left' in fp_str:
+            md['label'] = 0
+        elif 'right' in fp_str or 'attend_right' in fp_str:
+            md['label'] = 1
+        
+        # Set defaults if metadata not found (adjust as needed)
+        md['subject_id'] = md['subject_id'] or 1
+        md['trial_id'] = md['trial_id'] or 1
+        md['story_id'] = md['story_id'] or ((md['trial_id'] - 1) % 4) + 1
+        md['label'] = md['label'] if md['label'] is not None else 0
+            
+        return md
+    
+    def load_eeg_file(self, filepath: Path):
+        metadata = self._parse_filename(filepath)
+        
+        # Load .mat file and extract EEG array
+        mat_data = scipy.io.loadmat(filepath)
+        eeg_data = None
+        
+        # Look for common variable names in YOUR .mat files (add/remove keys as needed)
+        possible_keys = ['eeg', 'data', 'signal', 'X', 'raw_data']
+        for key in possible_keys:
+            if key in mat_data and isinstance(mat_data[key], np.ndarray):
+                eeg_data = mat_data[key]
+                break
+        
+        if eeg_data is None:
+            raise ValueError(f"Could not find EEG array in {filepath}. Check variable names.")
+        
+        # Ensure shape: (time × channels). Transpose if needed.
+        if eeg_data.shape[0] < eeg_data.shape[1]:  # Assume (channels × time) → transpose
+            eeg_data = eeg_data.T
+        
+        # Validate channel count against YOUR data (critical!)
+        if eeg_data.shape[1] != self.n_channels:
+            self.logger.warning(
+                f"Channel count mismatch in {filepath.name}: "
+                f"Expected {self.n_channels}, got {eeg_data.shape[1]}"
+            )
+        
+        return eeg_data, metadata
+    
+    def scan_dataset(self):
+       
+        files = list(self.data_root.rglob('*.mat'))
+        if not files:
+            self.logger.warning("No .mat files found in data root.")
+            return pd.DataFrame()
+        
+        records = [self._parse_filename(f) for f in files]
+        return pd.DataFrame(records)
+    
+    def create_leakage_proof_splits(self, df: pd.DataFrame):
+        
+        splits = []
+        for subj in df['subject_id'].unique():
+            subj_df = df[df['subject_id'] == subj]
+            trials = subj_df['trial_id'].unique()
+            np.random.shuffle(trials)
+            
+            n_train = int(0.8 * len(trials))
+            n_val = int(0.1 * len(trials))
+            train_trials = trials[:n_train]
+            val_trials = trials[n_train:n_train+n_val]
+            test_trials = trials[n_train+n_val:]
+            
+            splits.append({
+                'train_idx': subj_df[subj_df['trial_id'].isin(train_trials)].index.tolist(),
+                'val_idx': subj_df[subj_df['trial_id'].isin(val_trials)].index.tolist(),
+                'test_idx': subj_df[subj_df['trial_id'].isin(test_trials)].index.tolist()
+            })
+        
+        self.logger.info(f"Created {len(splits)} subject-specific splits.")
+        return splits
