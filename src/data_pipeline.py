@@ -54,7 +54,7 @@ class EEGDataset(Dataset):
 class EEGDataPipeline:
     """
     Complete EEG data processing pipeline.
-    - Works ONLY with KULDatasetLoader or DTUDatasetLoader
+
     - Creates leakage-proof CV splits using loader’s create_leakage_proof_splits()
     """
 
@@ -62,8 +62,6 @@ class EEGDataPipeline:
         """
         Args:
             config: Configuration object
-            dataset_loader: Must be KULDatasetLoader or DTUDatasetLoader instance
-            ssf_extractor: Optional SSFExtractor for spectro-spatial features
         """
         self.config = config
         self.logger = logging.getLogger(__name__)
@@ -111,7 +109,7 @@ class EEGDataPipeline:
         os.makedirs(output_dir, exist_ok=True)
 
         if self.dataset_loader is None:
-            raise ValueError("dataset_loader must be provided (KUL/DTU loader)")
+            raise ValueError("dataset_loader must be provided (KUL/DTU/AVGC dataloader)")
 
         df = self.dataset_loader.scan_dataset()
         self.logger.info(f"Found {len(df)} EEG files")
